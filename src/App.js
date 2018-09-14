@@ -22,29 +22,50 @@ const list = [
   }
 ];
 
+const isSearched = searchTerm => item =>
+  item.title.toLowerCase().includes(searchTerm.toLowerCase());
+
+// function isSearched(searchTerm) {
+//   return function (item) {
+//     return item.title.toLowerCase().includes(searchTerm.toLowerCase());
+//   }
+//}
+
 class App extends Component {
   constructor(props) {
     super(props);
 
     this.state = {
-      list
+      list,
+      searchTerm: '',
     }; //initial state
 
-    this.onDismiss = this.onDismiss.bind(this);//метод класса, бинд делаем для коллбэков
+    this.onSearchChange = this.onSearchChange.bind(this);
+    this.onDismiss = this.onDismiss.bind(this);//перепределяем метод класса,
+    //чтобы он использовал контекст определенного экземпляра класса
 }
 
     onDismiss(id) {
       const isNotId = item => item.objectID !==id;
       const updatedList = this.state.list.filter(isNotId);
       this.setState({list: updatedList});
-    }
+    }//метод класса
 
+    onSearchChange(evt) {
+      this.setState({searchTerm: evt.target.value});
+        }
 
   render() {
 
     return (
       <div className="App">
-        {this.state.list.map( item  =>
+        <form>
+          <input
+          type = "text"
+          onChange = {this.onSearchChange}
+          />
+        </form>
+        {this.state.list.filter(isSearched(this.state.searchTerm)).map( item  =>
             <div key={item.objectID}>
               <span>
                 <a href = {item.url}>{item.title}</a>
@@ -54,7 +75,9 @@ class App extends Component {
               <span>{item.points}</span>
               <span>
                 <button
-                  onClick = {() => this.onDismiss(item.objectID)}//у конкретного instance
+                  onClick = {() => this.onDismiss(item.objectID)}//при срабатывании обработчика,
+                  //вызывается метод класса, с контекстом конкретного экземпляра класса,
+                  //у которого сработал обработчик
                   type = 'button'>
                   Отбросить
                 </button>
