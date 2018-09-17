@@ -33,6 +33,8 @@ const Button = ({onClick, className = '', children}) =>
       </button>
 
 class App extends Component {
+  _isMounted = false;
+
   constructor(props) {
     super(props);
 
@@ -40,8 +42,10 @@ class App extends Component {
       results: null,
       searchKey: '',
       searchTerm: DEFAULT_QUERY,
+      error:null,
     }; //initial state
 
+    this.needsToSearchTopStories = this.needsToSearchTopStories.bind(this);
     this.setSearchTopStories = this.setSearchTopStories.bind(this);
     this.fetchSearchTopStories = this.fetchSearchTopStories.bind(this);
     this.onSearchChange = this.onSearchChange.bind(this);
@@ -49,6 +53,11 @@ class App extends Component {
     this.onDismiss = this.onDismiss.bind(this);//перепределяем метод класса,
     //чтобы он использовал контекст определенного экземпляра класса
 }
+
+    needsToSearchTopStories(searchTerm) {
+      return !this.state.results[searchTerm];
+    }
+
     setSearchTopStories(result) {
       const {hits, page} = result;
       const {searchKey, results} = this.state;
@@ -74,15 +83,22 @@ class App extends Component {
       fetch(`${PATH_BASE}${PATH_SEARCH}?${PARAM_SEARCH}${searchTerm}&${PARAM_PAGE}${page}`
         +`&${PARAM_HPP}${DEFAULT_HPP}`)
         .then(response => response.json())
-        .then(result => this.setSearchTopStories(result))
-        .catch(error => error);
+        .then(result => this._isMounted && this.setSearchTopStories(result))
+        .catch(error => this._isMounted && this.setState({error}));
     }
 
     onDismiss(id) {
+      const {searchKey, results} = this.state;
+      const {hits, page} = results[searchKey];
+
       const isNotId = item => item.objectID !== id;
-      const updatedHits = this.state.result.hits.filter(isNotId);
+      const updatedHits = hits.filter(isNotId);
+
       this.setState({
-        result: {...this.state.result, hits:updatedHits}
+        results: {
+          ...results,
+          [searchKey]: {hits:updatedHits, page}
+        }
       });
     }//метод класса
 
@@ -93,35 +109,52 @@ class App extends Component {
     onSearchSubmit(evt) {
       const {searchTerm} = this.state;
       this.setState({searchKey: searchTerm});
-      this.fetchSearchTopStories(searchTerm);
+      if (this.needsToSearchTopStories(searchTerm)) {
+        this.fetchSearchTopStories(searchTerm);
+      }
       evt.preventDefault();
     }
 
     componentDidMount() {
+      this._isMounted = true;
+
       const {searchTerm} = this.state;
       this.setState({searchKey: searchTerm});
       this.fetchSearchTopStories(searchTerm);
     }
 
+    componentWillUnmount() {
+      this._isMounted = false;
+    }
+
   render() {
-    const {searchTerm, results, searchKey} = this.state;
+    const {searchTerm, results, searchKey, error} = this.state;
     const page = (results && results[searchKey] && results[searchKey].page) || 0;
     const list = (results && results[searchKey] && results[searchKey].hits) || [];
+
+    if(error) {
+      return <p>Что-то произошло не так.</p>;
+    }
     return (
       <div className="page">
         <div className="interactions">
           <Search
-            value = {searchKey}
+            value = {searchTerm}
             onChange = {this.onSearchChange}
             onSubmit = {this.onSearchSubmit}
           >
             Поиск
           </Search>
         </div>
-        <Table
+        {error
+        ? <div className="interactions">
+          <p>Somethig went wrong.</p>
+        </div>
+        : <Table
           list = {list}
           onDismiss = {this.onDismiss}
         />
+        }
         <div className="interactions">
         <Button onClick={() => this.fetchSearchTopStories(searchKey, page+1)}>
           Больше историй
